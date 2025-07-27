@@ -1,0 +1,184 @@
+\documentclass[12pt, a4paper]{article}
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{array}
+\usepackage{booktabs}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mips}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=4,
+    frame=single
+}
+
+\title{Práctica de Laboratorio 4: Gestión de E/S en MIPS32}
+\author{Mike Gonzalez y Miguel Monsalves}
+\date{29 de julio de 2025}
+
+\begin{document}
+\maketitle
+
+\section{Introducción}
+Esta práctica implementa dos sistemas en MIPS32: un buffer circular de teclado con medición temporal y un semáforo controlado por pulsador con retardos por busy-wait. Ambos simulados en MARS, utilizando técnicas de sondeo y medición de ciclos de CPU.
+
+\section{Ejercicio 1: Buffer Circular con Medición Temporal}
+\subsection{Implementación}
+\lstinputlisting[style=mips, language={[mips]Assembler}]{buffer_circular.asm}
+
+\subsection{Explicación}
+\begin{itemize}
+    \item \textbf{Buffer Circular}: 
+        \begin{itemize}
+            \item Tamaño de 256 bytes con índices \texttt{head} (escritura) y \texttt{tail} (lectura)
+            \item Sobreescritura: Si \texttt{head == tail}, se avanza \texttt{tail} (descartando el carácter más antiguo)
+            \item Módulo 256 implementado con \texttt{andi \$reg, 0xFF}
+        \end{itemize}
+    
+    \item \textbf{Medición Temporal}:
+        \begin{itemize}
+            \item Uso del registro \texttt{\$9} (Count) del Coprocesador 0 (CP0)
+            \item Diferencia entre valores inicial y final para calcular ciclos consumidos
+        \end{itemize}
+    
+    \item \textbf{Entrada/Salida}:
+        \begin{itemize}
+            \item Syscall 12 para lectura de caracteres sin eco
+            \item Syscall 11 para impresión carácter por carácter
+            \item Condición de término: ASCII 10 (Enter)
+        \end{itemize}
+\end{itemize}
+
+\section{Ejercicio 2: Semáforo con Busy-Wait}
+\subsection{Implementación}
+\lstinputlisting[style=mips, language={[mips]Assembler}]{semaforo.asm}
+
+\subsection{Explicación}
+\begin{itemize}
+    \item \textbf{Máquina de Estados}:
+        \begin{itemize}
+            \item VERDE: Espera activa de 's' o 'q' (polling)
+            \item AMARILLO: Retardo de 10 segundos (busy-wait)
+            \item ROJO: Retardo de 30 segundos (busy-wait)
+        \end{itemize}
+    
+    \item \textbf{Retardo por Busy-Wait}:
+        \begin{itemize}
+            \item Función \texttt{delay\_busy} con calibración empírica
+            \item 400,000 iteraciones $\approx$ 1 segundo (ajustable según MARS)
+            \item Alto consumo de CPU pero comportamiento determinista
+        \end{itemize}
+    
+    \item \textbf{Métricas de Rendimiento}:
+        \begin{itemize}
+            \item Ciclos consumidos por fase (CP0 Count)
+            \item Ciclos totales y tiempo simulado acumulados
+            \item Eficiencia global (ciclos/segundo) al finalizar
+        \end{itemize}
+\end{itemize}
+
+\section{Análisis Comparativo}
+\subsection{Enfoques de Implementación}
+\begin{tabular}{|p{0.45\textwidth}|p{0.45\textwidth}|}
+\toprule
+\textbf{Ejercicio 1 (Sondeo)} & \textbf{Ejercicio 2 (Busy-Wait)} \\
+\midrule
+\begin{itemize}
+    \item Polling constante de teclado
+    \item CPU siempre ocupada
+    \item Simple implementación
+    \item Bajo overhead de sistema
+\end{itemize} &
+\begin{itemize}
+    \item Polling solo en estado VERDE
+    \item CPU 100\% ocupada en retardos
+    \item Calibración manual requerida
+    \item Métricas de rendimiento integradas
+\end{itemize} \\
+\bottomrule
+\end{tabular}
+
+\subsection{Registros Clave}
+\begin{center}
+\begin{tabular}{|c|c|l|}
+\hline
+\textbf{Ejercicio} & \textbf{Registro} & \textbf{Función} \\
+\hline
+\multirow{3}{*}{1} & \$s1 & Head (índice escritura) \\
+                   & \$s2 & Tail (índice lectura) \\
+                   & \$s3 & Ciclos iniciales (CP0) \\
+\hline
+\multirow{3}{*}{2} & \$s0 & Ciclos totales acumulados \\
+                   & \$s1 & Segundos totales simulados \\
+                   & \$t2 & Factor calibración busy-wait \\
+\hline
+\end{tabular}
+\end{center}
+
+\section{Respuestas Teóricas}
+\subsection{Ciclo de Interrupción}
+\begin{enumerate}
+    \item Evento externo (hardware)
+    \item Terminación instrucción actual
+    \item Guardado de EPC y Status
+    \item Salto a dirección 0x80000180
+    \item Ejecución de ISR (Rutina de Servicio)
+    \item Restauración de contexto
+    \item Retorno (eret)
+\end{enumerate}
+
+\subsection{Sondeo vs Interrupciones}
+\begin{itemize}
+    \item \textbf{Sondeo}: 
+        \begin{itemize}
+            \item CPU verifica dispositivos periódicamente
+            \item Desperdicio de ciclos en esperas
+            \item Simple implementación
+        \end{itemize}
+    \item \textbf{Interrupciones}:
+        \begin{itemize}
+            \item Dispositivos notifican a CPU
+            \item Óptimo uso de recursos
+            \item Complejidad en gestión de contexto
+        \end{itemize}
+\end{itemize}
+
+\subsection{Ventajas de Interrupciones}
+\begin{itemize}
+    \item Permite ejecución concurrente eficiente
+    \item Reduce consumo energético en esperas largas
+    \item Respuesta inmediata a eventos críticos
+    \item Facilita implementación de sistemas en tiempo real
+\end{itemize}
+
+\section{Conclusiones}
+\begin{itemize}
+    \item Se implementó un \textbf{buffer circular con sondeo} (Ej. 1), demostrando manejo eficiente de sobreescritura y medición precisa de ciclos mediante CP0.
+    \item Se simuló un \textbf{semáforo con busy-wait} (Ej. 2), destacando la importancia de calibración empírica para retardos temporales.
+    \item Ambos enfoques (sondeo y busy-wait) son viables en sistemas simples, pero presentan limitaciones de eficiencia frente a soluciones basadas en interrupciones.
+    \item El uso de \textbf{CP0 para medición temporal} demostró ser una herramienta valiosa para análisis de rendimiento.
+    \item Las soluciones funcionan correctamente en MARS siguiendo los protocolos de entrada/salida estándar.
+\end{itemize}
+
+\end{document}
